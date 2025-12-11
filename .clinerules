@@ -1,0 +1,50 @@
+# .clinerules
+
+## ENVIRONMENT
+
+You are running on windows with powershell. All commands should adhere to powershell specifics.
+
+## FILE WRITING RULES
+
+When using write_to_file:
+1. ALWAYS include the complete file content in the 'content' parameter
+2. NEVER use placeholders like "// ... rest of code ..."
+3. If content is too long, split into multiple smaller files
+4. If unsure about content, output "CONTENT_UNCERTAIN: [reason]" and STOP
+
+## LOOP PREVENTION
+- If ANY tool call fails 2 times with same error, output "BLOCKED: [tool_name]" and move to next task
+- Do NOT retry with identical parameters more than once
+- If you find yourself doing the same action 3+ times, STOP and report
+
+## TOOL CALL FORMAT VALIDATION
+Before calling ANY tool:
+- [ ] All required parameters are present
+- [ ] All parameters have actual values (not descriptions)
+- [ ] Content is complete (no truncation)
+
+## ERROR RECOVERY
+If tool error says "missing parameter X":
+1. First attempt: Add the missing parameter with complete value
+2. Second attempt: Verify ALL parameters are correct
+3. Third attempt: Output "TOOL_BLOCKED: [tool_name] - [reason]" and SKIP this action
+
+
+max_iterations: 5              # Stop after 5 attempts
+loop_detection: true           # Enable loop detection
+break_on_repeat: 2            # Break if same action repeats twice
+
+# Task execution rules
+task_timeout: 60              # 60 seconds per task
+require_checkboxes: true      # Must mark tasks complete
+enforce_single_action: true   # One action per response
+
+# Code generation rules
+max_code_lines: 200           # Max lines per generation
+require_imports: true         # Must include imports
+validate_syntax: true         # Check before output
+
+# Bevy-specific
+bevy_version: "0.17"
+shader_language: "wgsl"
+ui_framework: "bevy_egui"

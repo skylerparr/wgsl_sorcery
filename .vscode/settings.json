@@ -1,0 +1,5 @@
+{
+  "cline.experimental.fileEditingMode": "replace",
+  "cline.experimental.waitForEditorClose": true,
+  "cline.fileEditTimeout": 1200000
+}
