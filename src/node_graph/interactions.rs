@@ -102,36 +102,38 @@ pub fn handle_pin_interactions_system(
         let pointer_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or_default();
 
         if let Some(pending) = &ui_state.pending_connection {
-            // Check if we released over a node connection dot
+            // Check if we released over a blue or red connection dot
             for (_, node_instance) in node_graph.nodes.iter() {
                 let canvas_state = &node_graph.canvas_state;
                 let node_screen_pos = vec2_to_pos2(
                     (node_instance.position + canvas_state.offset) * canvas_state.zoom,
                 );
 
-                let dot_radius = 8.0;
+                let dot_radius = 12.0;
 
-                // Check left connection dot - positioned to the left of "Inputs:" label
-                let inputs_label_pos =
-                    node_screen_pos + egui::vec2(0.0, node_instance.header_height + 2.0);
-                let left_dot_center = inputs_label_pos + egui::vec2(-dot_radius * 2.0, 8.0);
-                let left_dot_rect = egui::Rect::from_center_size(
-                    left_dot_center,
+                // Calculate the Area rectangle (same as used in render system)
+                let header_rect = egui::Rect::from_min_size(
+                    node_screen_pos,
+                    egui::vec2(220.0, node_instance.header_height + 70.0),
+                );
+
+                // Check blue connection dot - positioned at (50.0, 70.0) relative to header_rect.min
+                let blue_dot_center = header_rect.min + egui::vec2(50.0, 70.0);
+                let blue_dot_rect = egui::Rect::from_center_size(
+                    blue_dot_center,
                     egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
                 );
 
-                // Check right connection dot - positioned to the right of "Outputs:" label
-                let outputs_label_pos =
-                    node_screen_pos + egui::vec2(140.0, node_instance.header_height + 2.0);
-                let right_dot_center = outputs_label_pos + egui::vec2(40.0, 8.0);
-                let right_dot_rect = egui::Rect::from_center_size(
-                    right_dot_center,
+                // Check red connection dot - positioned at (170.0, 70.0) relative to header_rect.min
+                let red_dot_center = header_rect.min + egui::vec2(170.0, 70.0);
+                let red_dot_rect = egui::Rect::from_center_size(
+                    red_dot_center,
                     egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
                 );
 
                 let from_node_id = NodeId(pending.from_pin.0);
 
-                if left_dot_rect.contains(pointer_pos) || right_dot_rect.contains(pointer_pos) {
+                if blue_dot_rect.contains(pointer_pos) || red_dot_rect.contains(pointer_pos) {
                     if node_instance.node_id != from_node_id {
                         // Create node-to-node connection
                         let new_connection = Connection {
@@ -159,58 +161,67 @@ pub fn handle_pin_interactions_system(
     if ctx.input(|i| i.pointer.any_pressed()) {
         let pointer_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or_default();
 
-        // Check for input/output pins
-        let mut clicked_pin: Option<(PinId, bool)> = None; // (pin_id, is_input)
-
-        // First check for connection dots on node headers (higher priority)
-        let mut clicked_node_dot: Option<(NodeId, bool)> = None; // (node_id, is_left_dot)
+        // Check for connection dots on nodes (higher priority)
+        let mut clicked_node_dot: Option<(NodeId, bool)> = None; // (node_id, is_blue_dot)
 
         for (_, node_instance) in node_graph.nodes.iter() {
             let canvas_state = &node_graph.canvas_state;
             let node_screen_pos =
                 vec2_to_pos2((node_instance.position + canvas_state.offset) * canvas_state.zoom);
 
-            let dot_radius = 8.0;
+            let dot_radius = 12.0;
 
-            // Check left connection dot - positioned to the left of "Inputs:" label
-            let inputs_label_pos =
-                node_screen_pos + egui::vec2(0.0, node_instance.header_height + 2.0);
-            let left_dot_center = inputs_label_pos + egui::vec2(-dot_radius * 2.0, 8.0);
-            let left_dot_rect = egui::Rect::from_center_size(
-                left_dot_center,
+            // Calculate the Area rectangle (same as used in render system)
+            let header_rect = egui::Rect::from_min_size(
+                node_screen_pos,
+                egui::vec2(220.0, node_instance.header_height + 70.0),
+            );
+
+            // Check blue connection dot - positioned at (50.0, 70.0) relative to header_rect.min
+            let blue_dot_center = header_rect.min + egui::vec2(50.0, 70.0);
+            let blue_dot_rect = egui::Rect::from_center_size(
+                blue_dot_center,
                 egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
             );
 
-            if left_dot_rect.contains(pointer_pos) {
+            debug!(
+                "Checking blue dot rect: {:?} for pointer at: {:?}",
+                blue_dot_rect, pointer_pos
+            );
+
+            if blue_dot_rect.contains(pointer_pos) {
                 debug!(
-                    "Clicked left connection dot on node {:?}",
+                    "Clicked blue connection dot on node {:?}",
                     node_instance.node_id
                 );
-                clicked_node_dot = Some((node_instance.node_id, true)); // true = left dot
+                clicked_node_dot = Some((node_instance.node_id, true)); // true = blue dot
                 break;
             }
 
-            // Check right connection dot - positioned to the right of "Outputs:" label
-            let outputs_label_pos =
-                node_screen_pos + egui::vec2(140.0, node_instance.header_height + 2.0);
-            let right_dot_center = outputs_label_pos + egui::vec2(40.0, 8.0);
-            let right_dot_rect = egui::Rect::from_center_size(
-                right_dot_center,
+            // Check red connection dot - positioned at (170.0, 70.0) relative to header_rect.min
+            let red_dot_center = header_rect.min + egui::vec2(170.0, 70.0);
+            let red_dot_rect = egui::Rect::from_center_size(
+                red_dot_center,
                 egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
             );
 
-            if right_dot_rect.contains(pointer_pos) {
+            debug!(
+                "Checking red dot rect: {:?} for pointer at: {:?}",
+                red_dot_rect, pointer_pos
+            );
+
+            if red_dot_rect.contains(pointer_pos) {
                 debug!(
-                    "Clicked right connection dot on node {:?}",
+                    "Clicked red connection dot on node {:?}",
                     node_instance.node_id
                 );
-                clicked_node_dot = Some((node_instance.node_id, false)); // false = right dot
+                clicked_node_dot = Some((node_instance.node_id, false)); // false = red dot
                 break;
             }
         }
 
         // If we clicked a node connection dot, handle that instead of pins
-        if let Some((node_id, _is_left)) = clicked_node_dot {
+        if let Some((node_id, _is_blue)) = clicked_node_dot {
             debug!("Starting node-to-node connection from node {:?}", node_id);
             ui_state.pending_connection = Some(PendingConnection {
                 from_pin: PinId(node_id.0), // Use node ID as pin ID for simplicity
@@ -219,21 +230,30 @@ pub fn handle_pin_interactions_system(
             return;
         }
 
-        // Check for traditional pin connections (existing logic)
+        // Check for input/output pins (fallback)
+        let mut clicked_pin: Option<(PinId, bool)> = None; // (pin_id, is_input)
+
+        // Check for traditional pin connections (matching the render system)
         for (_, node_instance) in node_graph.nodes.iter() {
             let canvas_state = &node_graph.canvas_state;
             let node_screen_pos =
                 vec2_to_pos2((node_instance.position + canvas_state.offset) * canvas_state.zoom);
 
-            // Check input pins - positioned relative to node screen position
+            // Calculate the Area rectangle (same as used in render system)
+            let header_rect = egui::Rect::from_min_size(
+                node_screen_pos,
+                egui::vec2(220.0, node_instance.header_height + 70.0),
+            );
+
+            // Check input pins - positioned relative to header_rect.min (matching render system)
             for (i, input_pin) in node_instance.inputs.iter().enumerate() {
                 let pin_radius = 6.0;
-                let pin_x = node_screen_pos.x - pin_radius; // Left side pins
-                let pin_y =
-                    node_screen_pos.y + node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
+                let pin_x = -6.0; // Slightly outside the node border (matching render system)
+                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
 
-                let pin_rect = egui::Rect::from_min_size(
-                    egui::pos2(pin_x, pin_y),
+                let pin_center = header_rect.min + egui::vec2(pin_x, pin_y);
+                let pin_rect = egui::Rect::from_center_size(
+                    pin_center,
                     egui::vec2(pin_radius * 2.0, pin_radius * 2.0),
                 );
 
@@ -247,15 +267,15 @@ pub fn handle_pin_interactions_system(
                 }
             }
 
-            // Check output pins - positioned relative to node screen position
+            // Check output pins - positioned relative to header_rect.min (matching render system)
             for (i, output_pin) in node_instance.outputs.iter().enumerate() {
                 let pin_radius = 6.0;
-                let pin_x = node_screen_pos.x + 220.0; // Right side of node (220px wide)
-                let pin_y =
-                    node_screen_pos.y + node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
+                let pin_x = 226.0; // Slightly outside the node border (matching render system)
+                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
 
-                let pin_rect = egui::Rect::from_min_size(
-                    egui::pos2(pin_x, pin_y),
+                let pin_center = header_rect.min + egui::vec2(pin_x, pin_y);
+                let pin_rect = egui::Rect::from_center_size(
+                    pin_center,
                     egui::vec2(pin_radius * 2.0, pin_radius * 2.0),
                 );
 
