@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_egui::egui;
 use std::collections::HashMap;
 
 // Unique identifiers for nodes and pins
@@ -29,6 +30,9 @@ pub struct NodeInstance {
     pub inputs: Vec<InputPin>,
     pub outputs: Vec<OutputPin>,
     pub title: String,
+    pub size: Vec2,
+    pub header_height: f32,
+    pub pin_offsets: (Vec<(PinId, Vec2)>, Vec<(PinId, Vec2)>), // (input_pin_offsets, output_pin_offsets)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,6 +52,21 @@ pub struct NodeGraph {
 pub struct CanvasState {
     pub zoom: f32,
     pub offset: Vec2,
+}
+
+// Add the GraphUiState struct here
+#[derive(Debug, Clone, Default)]
+pub struct GraphUiState {
+    pub pending_connection: Option<PendingConnection>,
+    pub active_drag_node: Option<NodeId>,
+    pub drag_origin: Vec2,
+    pub drag_offset: Vec2,
+}
+
+#[derive(Debug, Clone)]
+pub struct PendingConnection {
+    pub from_pin: PinId,
+    pub from_screen_pos: egui::Pos2,
 }
 
 impl Default for CanvasState {

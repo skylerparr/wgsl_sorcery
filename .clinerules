@@ -29,6 +29,14 @@ If tool error says "missing parameter X":
 2. Second attempt: Verify ALL parameters are correct
 3. Third attempt: Output "TOOL_BLOCKED: [tool_name] - [reason]" and SKIP this action
 
+# DEFINITION OF TASK COMPLETE
+
+Code must compile with `cargo check` and must run `cargo run` for at least 10 seconds.
+
+# **CRITICAL IMPORTANCE!!!!!!!!!!!!!!!!!!!!!!!!!!!**
+
+**NEVER DELETE CODE TO MAKE THE PROJECT COMPILE. THAT IS THE BIGGEST VIOLATION. AGAIN, NEVER
+EVER EVER EVER DELETE CODE TO GET THE PROJECT TO COMPILE.**
 
 max_iterations: 5              # Stop after 5 attempts
 loop_detection: true           # Enable loop detection

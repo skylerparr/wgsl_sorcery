@@ -29,6 +29,9 @@ pub fn spawn_test_node_system(mut node_graph: ResMut<NodeGraph>, input: Res<Butt
             inputs: vec![input_pin1, input_pin2],
             outputs: vec![output_pin],
             title: "TestNode".to_string(),
+            size: Vec2::new(220.0, 100.0),
+            header_height: 24.0,
+            pin_offsets: (vec![], vec![]), // Will be populated by rendering system
         };
 
         warn!("DEBUG: Adding node to graph");

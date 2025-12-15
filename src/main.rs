@@ -1,4 +1,5 @@
 use crate::node_graph::model::NodeGraph;
+use crate::node_graph::ui_state::GraphUiState;
 use bevy::prelude::*;
 
 mod node_graph;
@@ -17,14 +18,16 @@ fn main() {
         .add_plugins(bevy_egui::EguiPlugin::default())
         // Node graph resources
         .init_resource::<NodeGraph>()
+        .init_resource::<GraphUiState>()
         // Systems
         .add_systems(Startup, setup)
         // Canvas systems
         .add_systems(Update, node_graph::canvas::update_canvas_system)
-        .add_systems(Update, node_graph::canvas::render_canvas_background_system)
+        .add_systems(Update, node_graph::render::render_canvas_background_system)
         // Node rendering systems
         .add_systems(Update, node_graph::render::render_nodes_system)
         .add_systems(Update, node_graph::render::render_connections_system)
+        .add_systems(Update, node_graph::render::render_pending_connection_system)
         // Node interaction systems
         .add_systems(Update, node_graph::interactions::handle_node_drag_system)
         .add_systems(
