@@ -97,25 +97,140 @@ pub fn handle_pin_interactions_system(
 ) {
     let ctx = egui_contexts.ctx_mut().expect("Failed to get egui context");
 
-    if ctx.input(|i| i.pointer.any_pressed()) {
+    // First check for mouse release on connection dots (for completing node-to-node connections)
+    if ctx.input(|i| i.pointer.any_released()) {
         let pointer_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or_default();
 
-        // Check if we clicked on a pin
-        let canvas_pos = screen_to_canvas(pointer_pos, &node_graph.canvas_state);
+        if let Some(pending) = &ui_state.pending_connection {
+            // Check if we released over a node connection dot
+            for (_, node_instance) in node_graph.nodes.iter() {
+                let canvas_state = &node_graph.canvas_state;
+                let node_screen_pos = vec2_to_pos2(
+                    (node_instance.position + canvas_state.offset) * canvas_state.zoom,
+                );
+
+                let dot_radius = 8.0;
+
+                // Check left connection dot - positioned to the left of "Inputs:" label
+                let inputs_label_pos =
+                    node_screen_pos + egui::vec2(0.0, node_instance.header_height + 2.0);
+                let left_dot_center = inputs_label_pos + egui::vec2(-dot_radius * 2.0, 8.0);
+                let left_dot_rect = egui::Rect::from_center_size(
+                    left_dot_center,
+                    egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
+                );
+
+                // Check right connection dot - positioned to the right of "Outputs:" label
+                let outputs_label_pos =
+                    node_screen_pos + egui::vec2(140.0, node_instance.header_height + 2.0);
+                let right_dot_center = outputs_label_pos + egui::vec2(40.0, 8.0);
+                let right_dot_rect = egui::Rect::from_center_size(
+                    right_dot_center,
+                    egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
+                );
+
+                let from_node_id = NodeId(pending.from_pin.0);
+
+                if left_dot_rect.contains(pointer_pos) || right_dot_rect.contains(pointer_pos) {
+                    if node_instance.node_id != from_node_id {
+                        // Create node-to-node connection
+                        let new_connection = Connection {
+                            from_pin: pending.from_pin,
+                            to_pin: PinId(node_instance.node_id.0),
+                        };
+
+                        debug!(
+                            "Creating node-to-node connection from node {:?} to node {:?}",
+                            from_node_id, node_instance.node_id
+                        );
+                        node_graph.add_connection(new_connection);
+                        debug!(
+                            "Node-to-node connection created successfully. Total connections: {}",
+                            node_graph.connections.len()
+                        );
+                        ui_state.pending_connection = None;
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    if ctx.input(|i| i.pointer.any_pressed()) {
+        let pointer_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or_default();
 
         // Check for input/output pins
         let mut clicked_pin: Option<(PinId, bool)> = None; // (pin_id, is_input)
 
-        for (_, node_instance) in node_graph.nodes.iter() {
-            let node_screen_pos =
-                canvas_to_screen(node_instance.position, &node_graph.canvas_state);
+        // First check for connection dots on node headers (higher priority)
+        let mut clicked_node_dot: Option<(NodeId, bool)> = None; // (node_id, is_left_dot)
 
-            // Check input pins
-            for input_pin in &node_instance.inputs {
-                // Simplified pin hit detection - would normally use stored pin positions
+        for (_, node_instance) in node_graph.nodes.iter() {
+            let canvas_state = &node_graph.canvas_state;
+            let node_screen_pos =
+                vec2_to_pos2((node_instance.position + canvas_state.offset) * canvas_state.zoom);
+
+            let dot_radius = 8.0;
+
+            // Check left connection dot - positioned to the left of "Inputs:" label
+            let inputs_label_pos =
+                node_screen_pos + egui::vec2(0.0, node_instance.header_height + 2.0);
+            let left_dot_center = inputs_label_pos + egui::vec2(-dot_radius * 2.0, 8.0);
+            let left_dot_rect = egui::Rect::from_center_size(
+                left_dot_center,
+                egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
+            );
+
+            if left_dot_rect.contains(pointer_pos) {
+                debug!(
+                    "Clicked left connection dot on node {:?}",
+                    node_instance.node_id
+                );
+                clicked_node_dot = Some((node_instance.node_id, true)); // true = left dot
+                break;
+            }
+
+            // Check right connection dot - positioned to the right of "Outputs:" label
+            let outputs_label_pos =
+                node_screen_pos + egui::vec2(140.0, node_instance.header_height + 2.0);
+            let right_dot_center = outputs_label_pos + egui::vec2(40.0, 8.0);
+            let right_dot_rect = egui::Rect::from_center_size(
+                right_dot_center,
+                egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
+            );
+
+            if right_dot_rect.contains(pointer_pos) {
+                debug!(
+                    "Clicked right connection dot on node {:?}",
+                    node_instance.node_id
+                );
+                clicked_node_dot = Some((node_instance.node_id, false)); // false = right dot
+                break;
+            }
+        }
+
+        // If we clicked a node connection dot, handle that instead of pins
+        if let Some((node_id, _is_left)) = clicked_node_dot {
+            debug!("Starting node-to-node connection from node {:?}", node_id);
+            ui_state.pending_connection = Some(PendingConnection {
+                from_pin: PinId(node_id.0), // Use node ID as pin ID for simplicity
+                from_screen_pos: pointer_pos,
+            });
+            return;
+        }
+
+        // Check for traditional pin connections (existing logic)
+        for (_, node_instance) in node_graph.nodes.iter() {
+            let canvas_state = &node_graph.canvas_state;
+            let node_screen_pos =
+                vec2_to_pos2((node_instance.position + canvas_state.offset) * canvas_state.zoom);
+
+            // Check input pins - positioned relative to node screen position
+            for (i, input_pin) in node_instance.inputs.iter().enumerate() {
                 let pin_radius = 6.0;
                 let pin_x = node_screen_pos.x - pin_radius; // Left side pins
-                let pin_y = node_screen_pos.y + 30.0; // Start from header height
+                let pin_y =
+                    node_screen_pos.y + node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
 
                 let pin_rect = egui::Rect::from_min_size(
                     egui::pos2(pin_x, pin_y),
@@ -123,17 +238,21 @@ pub fn handle_pin_interactions_system(
                 );
 
                 if pin_rect.contains(pointer_pos) {
+                    debug!(
+                        "Clicked input pin {:?} on node {:?}",
+                        input_pin.pin_id, node_instance.node_id
+                    );
                     clicked_pin = Some((input_pin.pin_id, true));
                     break;
                 }
             }
 
-            // Check output pins
-            for output_pin in &node_instance.outputs {
-                // Simplified pin hit detection - would normally use stored pin positions
+            // Check output pins - positioned relative to node screen position
+            for (i, output_pin) in node_instance.outputs.iter().enumerate() {
                 let pin_radius = 6.0;
-                let pin_x = node_screen_pos.x + 200.0; // Right side pins
-                let pin_y = node_screen_pos.y + 30.0; // Start from header height
+                let pin_x = node_screen_pos.x + 220.0; // Right side of node (220px wide)
+                let pin_y =
+                    node_screen_pos.y + node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
 
                 let pin_rect = egui::Rect::from_min_size(
                     egui::pos2(pin_x, pin_y),
@@ -141,6 +260,10 @@ pub fn handle_pin_interactions_system(
                 );
 
                 if pin_rect.contains(pointer_pos) {
+                    debug!(
+                        "Clicked output pin {:?} on node {:?}",
+                        output_pin.pin_id, node_instance.node_id
+                    );
                     clicked_pin = Some((output_pin.pin_id, false));
                     break;
                 }
@@ -162,11 +285,22 @@ pub fn handle_pin_interactions_system(
                         to_pin: pin_id,
                     };
 
+                    debug!(
+                        "Creating connection from pin {:?} to pin {:?}",
+                        pending.from_pin, pin_id
+                    );
                     node_graph.add_connection(new_connection);
+                    debug!(
+                        "Connection created successfully. Total connections: {}",
+                        node_graph.connections.len()
+                    );
                     ui_state.pending_connection = None;
+                } else {
+                    debug!("Clicked input pin {:?} but no pending connection", pin_id);
                 }
             } else {
                 // Clicked on output pin - start a new connection
+                debug!("Starting connection from output pin {:?}", pin_id);
                 ui_state.pending_connection = Some(PendingConnection {
                     from_pin: pin_id,
                     from_screen_pos: pointer_pos,
@@ -175,6 +309,7 @@ pub fn handle_pin_interactions_system(
         } else {
             // Clicked on empty space - cancel any pending connection
             if ui_state.pending_connection.is_some() {
+                debug!("Clicked empty space, canceling pending connection");
                 ui_state.pending_connection = None;
             }
         }

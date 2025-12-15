@@ -203,19 +203,42 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
 
                     ui.add_space(node_instance.header_height);
 
+                    // DRAW THE BLUE CONNECTION DOTS HERE - positioned within the content area next to input/output sections
+                    let dot_radius = 12.0; // Large, visible dots
+
+                    // Create a painter for the current content area
+                    let content_painter = ui.painter();
+
+                    // Blue input connection dot - positioned within content area, left side (next to Inputs)
+                    let blue_dot_pos = header_response.rect.min + egui::vec2(50.0, 70.0);
+                    content_painter.circle_filled(
+                        blue_dot_pos,
+                        dot_radius,
+                        egui::Color32::from_rgb(0, 0, 255), // Pure blue
+                    );
+
+                    // Red output connection dot - positioned within content area, right side (next to Outputs)
+                    let red_dot_pos = header_response.rect.min + egui::vec2(170.0, 70.0);
+                    content_painter.circle_filled(
+                        red_dot_pos,
+                        dot_radius,
+                        egui::Color32::from_rgb(255, 0, 0), // Pure red
+                    );
+
                     // Input pins section
                     ui.horizontal(|ui| {
                         // Input pins on the left
                         ui.vertical(|ui| {
                             ui.label("Inputs:");
                             for (i, input_pin) in node_instance.inputs.iter().enumerate() {
-                                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0);
+                                let pin_radius = 6.0;
                                 let pin_x = -6.0; // Slightly outside the node border
+                                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
 
                                 // Draw pin circle
                                 painter.circle_filled(
                                     header_response.rect.min + egui::vec2(pin_x, pin_y),
-                                    6.0,
+                                    pin_radius,
                                     egui::Color32::from_gray(200),
                                 );
 
@@ -229,13 +252,14 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
                         ui.vertical(|ui| {
                             ui.label("Outputs:");
                             for (i, output_pin) in node_instance.outputs.iter().enumerate() {
-                                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0);
+                                let pin_radius = 6.0;
                                 let pin_x = 226.0; // Slightly outside the node border
+                                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
 
                                 // Draw pin circle
                                 painter.circle_filled(
                                     header_response.rect.min + egui::vec2(pin_x, pin_y),
-                                    6.0,
+                                    pin_radius,
                                     egui::Color32::from_gray(200),
                                 );
 
@@ -251,6 +275,12 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
 // Helper functions
 fn find_pin_position(pin_id: PinId, node_graph: &NodeGraph) -> Option<Vec2> {
     for (_, node) in &node_graph.nodes {
+        // Check if this pin_id corresponds to a node connection dot (using node ID as pin ID)
+        if pin_id.0 == node.node_id.0 {
+            // Return the position of the right connection dot (arbitrary choice for node-to-node connections)
+            return Some(node.position + Vec2::new(220.0, node.header_height / 2.0));
+        }
+
         for input_pin in &node.inputs {
             if input_pin.pin_id == pin_id {
                 // Calculate input pin position
