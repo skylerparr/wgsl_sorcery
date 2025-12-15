@@ -3,6 +3,16 @@ use crate::node_graph::ui_state::{GraphUiState, PendingConnection};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 
+// Convert from bevy Vec2 to egui Pos2
+fn vec2_to_pos2(vec: Vec2) -> egui::Pos2 {
+    egui::pos2(vec.x, vec.y)
+}
+
+// Convert from egui Pos2 to bevy Vec2
+fn pos2_to_vec2(pos: egui::Pos2) -> Vec2 {
+    Vec2::new(pos.x, pos.y)
+}
+
 pub fn handle_node_drag_system(
     mut node_graph: ResMut<NodeGraph>,
     mut ui_state: ResMut<GraphUiState>,
@@ -10,73 +20,71 @@ pub fn handle_node_drag_system(
 ) {
     let ctx = egui_contexts.ctx_mut().expect("Failed to get egui context");
 
-    // Handle dragging logic
+    // Handle dragging logic - simplified approach using pointer state directly
+    let pointer_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or_default();
+    let is_primary_pressed = ctx.input(|i| i.pointer.primary_down());
+    let is_primary_released = ctx.input(|i| i.pointer.primary_released());
+
+    // Stop dragging if primary button was released
+    if is_primary_released && ui_state.active_drag_node.is_some() {
+        debug!(
+            "Primary button released, stopping drag for node: {:?}",
+            ui_state.active_drag_node
+        );
+        ui_state.active_drag_node = None;
+        return;
+    }
+
+    // If we're actively dragging, update position based on mouse movement
     if let Some(active_drag_node_id) = ui_state.active_drag_node {
-        // Debug logging for active dragging
-        debug!("Dragging node: {:?}", active_drag_node_id);
+        let drag_delta = ctx.input(|i| i.pointer.delta());
+        if drag_delta != egui::Vec2::ZERO {
+            debug!(
+                "Dragging node {:?} with delta {:?}",
+                active_drag_node_id, drag_delta
+            );
 
-        if ctx.input(|i| i.pointer.any_pressed()) {
-            // If we're already dragging, update the drag offset
-            let pointer_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or_default();
-            debug!("Pointer pressed during drag at position: {:?}", pointer_pos);
-
-            let canvas_pos = screen_to_canvas(pointer_pos, &node_graph.canvas_state);
-            debug!("Converted pointer to canvas position: {:?}", canvas_pos);
+            // Convert screen delta to canvas delta
+            let canvas_delta = Vec2::new(drag_delta.x, drag_delta.y) / node_graph.canvas_state.zoom;
 
             // Update node position
             if let Some(node) = node_graph.nodes.get_mut(&active_drag_node_id) {
-                let new_position = canvas_pos - ui_state.drag_offset;
+                let new_position = node.position + canvas_delta;
                 debug!(
-                    "Updating node {:?} position from {:?} to {:?}",
+                    "Moving node {:?} from {:?} to {:?}",
                     active_drag_node_id, node.position, new_position
                 );
                 node.position = new_position;
             }
-        } else if ctx.input(|i| i.pointer.any_released()) {
-            // Stop dragging
-            debug!("Dragging released for node: {:?}", active_drag_node_id);
-            ui_state.active_drag_node = None;
         }
-    } else {
-        // Check for drag start on node header
-        let pointer_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or_default();
-        debug!(
-            "Checking for drag start at pointer position: {:?}",
-            pointer_pos
-        );
+        return;
+    }
 
-        let canvas_pos = screen_to_canvas(pointer_pos, &node_graph.canvas_state);
-        debug!("Converted to canvas position: {:?}", canvas_pos);
+    // Check for drag start - if primary button is pressed and we're over a node header
+    if is_primary_pressed {
+        debug!("Primary button pressed at position: {:?}", pointer_pos);
 
-        // Check if pointer is over a node header (simplified check)
+        // Check if pointer is over any node header
         for (_, node_instance) in node_graph.nodes.iter() {
+            let canvas_state = &node_graph.canvas_state;
             let node_screen_pos =
-                canvas_to_screen(node_instance.position, &node_graph.canvas_state);
+                vec2_to_pos2((node_instance.position + canvas_state.offset) * canvas_state.zoom);
 
-            // Simple header area check
+            // Check header area
             let header_rect = egui::Rect::from_min_size(
                 node_screen_pos,
-                egui::vec2(200.0, 30.0), // Approximate header size
+                egui::vec2(220.0, node_instance.header_height), // Node width and header height
             );
 
             if header_rect.contains(pointer_pos) {
                 debug!(
-                    "Pointer is over node header for node: {:?}",
-                    node_instance.node_id
+                    "Starting drag for node: {:?} at screen pos {:?}",
+                    node_instance.node_id, pointer_pos
                 );
-                if ctx.input(|i| i.pointer.primary_down()) {
-                    // Start dragging
-                    debug!("Starting drag for node: {:?}", node_instance.node_id);
-                    ui_state.active_drag_node = Some(node_instance.node_id);
-                    ui_state.drag_origin = canvas_pos;
-                    ui_state.drag_offset = canvas_pos - node_instance.position;
-                    break;
-                }
-            } else {
-                debug!(
-                    "Pointer not over node header for node: {:?}",
-                    node_instance.node_id
-                );
+                ui_state.active_drag_node = Some(node_instance.node_id);
+                // Store the current position as the drag origin
+                ui_state.drag_origin = node_instance.position;
+                break;
             }
         }
     }
