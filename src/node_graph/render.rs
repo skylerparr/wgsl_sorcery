@@ -277,20 +277,20 @@ fn find_pin_position(pin_id: PinId, node_graph: &NodeGraph) -> Option<Vec2> {
     for (_, node) in &node_graph.nodes {
         // Check if this pin_id corresponds to a node connection dot (using node ID as pin ID)
         if pin_id.0 == node.node_id.0 {
-            // Return the position of the right connection dot (arbitrary choice for node-to-node connections)
-            return Some(node.position + Vec2::new(220.0, node.header_height / 2.0));
+            // Return the position of the red connection dot center (for node-to-node connections)
+            return Some(node.position + Vec2::new(170.0, 70.0));
         }
 
         for input_pin in &node.inputs {
             if input_pin.pin_id == pin_id {
-                // Calculate input pin position
-                return Some(node.position + Vec2::new(0.0, node.header_height + 20.0));
+                // Calculate input pin position - blue dot center
+                return Some(node.position + Vec2::new(50.0, 70.0));
             }
         }
         for output_pin in &node.outputs {
             if output_pin.pin_id == pin_id {
-                // Calculate output pin position
-                return Some(node.position + Vec2::new(220.0, node.header_height + 20.0));
+                // Calculate output pin position - red dot center
+                return Some(node.position + Vec2::new(170.0, 70.0));
             }
         }
     }
