@@ -1,0 +1,154 @@
+use crate::node_graph::model::{CanvasState, NodeGraph, NodeId, PinId};
+use bevy::prelude::*;
+
+/// Centralized pin position manager - single source of truth for all pin positions
+#[derive(Resource, Default)]
+pub struct PinPositionManager {
+    /// Cache of calculated pin positions in screen space for the current frame
+    cached_positions: std::collections::HashMap<PinId, Vec2>,
+    /// Cache invalidation marker
+    frame_version: u64,
+    current_frame: u64,
+}
+
+impl PinPositionManager {
+    /// Get pin position in screen space - single point of authority
+    pub fn get_pin_screen_position(
+        &mut self,
+        pin_id: PinId,
+        node_graph: &NodeGraph,
+        canvas_state: &CanvasState,
+    ) -> Option<Vec2> {
+        let zoom = canvas_state.zoom;
+
+        // Check cache first
+        if let Some(&cached_pos) = self.cached_positions.get(&pin_id) {
+            return Some(cached_pos);
+        }
+
+        // Calculate position if not in cache
+        let position = self.calculate_pin_position_raw(pin_id, node_graph, canvas_state);
+
+        // Cache the result
+        if let Some(pos) = position {
+            self.cached_positions.insert(pin_id, pos);
+        }
+
+        position
+    }
+
+    /// Calculate pin position in screen space (internal calculation)
+    fn calculate_pin_position_raw(
+        &self,
+        pin_id: PinId,
+        node_graph: &NodeGraph,
+        canvas_state: &CanvasState,
+    ) -> Option<Vec2> {
+        let zoom = canvas_state.zoom;
+
+        for (_, node) in &node_graph.nodes {
+            // Check node connection dots first (new system)
+            // Input Nodes: PinId(node_id.0 * 2)
+            // Output Nodes: PinId(node_id.0 * 2 + 1)
+            if pin_id.0 == node.node_id.0 * 2 {
+                // Input Node position
+                let screen_pos =
+                    ((node.position + canvas_state.offset) * zoom) + Vec2::new(50.0, 70.0);
+                return Some(screen_pos);
+            } else if pin_id.0 == node.node_id.0 * 2 + 1 {
+                // Output Node position
+                let screen_pos =
+                    ((node.position + canvas_state.offset) * zoom) + Vec2::new(170.0, 70.0);
+                return Some(screen_pos);
+            }
+
+            // Check traditional pins (fallback)
+            for input_pin in &node.inputs {
+                if input_pin.pin_id == pin_id {
+                    let screen_pos =
+                        ((node.position + canvas_state.offset) * zoom) + Vec2::new(50.0, 70.0);
+                    return Some(screen_pos);
+                }
+            }
+            for output_pin in &node.outputs {
+                if output_pin.pin_id == pin_id {
+                    let screen_pos =
+                        ((node.position + canvas_state.offset) * zoom) + Vec2::new(170.0, 70.0);
+                    return Some(screen_pos);
+                }
+            }
+        }
+        None
+    }
+
+    /// Invalidate cache (call this when nodes move or canvas state changes)
+    pub fn invalidate_cache(&mut self) {
+        self.frame_version += 1;
+        // Always clear cache every frame to ensure connections follow nodes
+        self.cached_positions.clear();
+    }
+
+    /// Get pin position in canvas space (for interactions)
+    pub fn get_pin_canvas_position(
+        &mut self,
+        pin_id: PinId,
+        node_graph: &NodeGraph,
+        canvas_state: &CanvasState,
+    ) -> Option<Vec2> {
+        let screen_pos = self.get_pin_screen_position(pin_id, node_graph, canvas_state)?;
+        Some(screen_pos / canvas_state.zoom - canvas_state.offset)
+    }
+
+    /// Get connection endpoints for drawing (returns screen space positions)
+    pub fn get_connection_endpoints(
+        &mut self,
+        from_pin: PinId,
+        to_pin: PinId,
+        node_graph: &NodeGraph,
+        canvas_state: &CanvasState,
+    ) -> Option<(Vec2, Vec2)> {
+        let from_pos = self.get_pin_screen_position(from_pin, node_graph, canvas_state)?;
+        let to_pos = self.get_pin_screen_position(to_pin, node_graph, canvas_state)?;
+        Some((from_pos, to_pos))
+    }
+
+    /// Check if pin is an Input Node
+    pub fn is_input_node(pin_id: PinId) -> bool {
+        pin_id.0 % 2 == 0
+    }
+
+    /// Check if pin is an Output Node  
+    pub fn is_output_node(pin_id: PinId) -> bool {
+        pin_id.0 % 2 == 1
+    }
+
+    /// Get the node that owns this pin
+    pub fn get_pin_owner_node(&self, pin_id: PinId, node_graph: &NodeGraph) -> Option<NodeId> {
+        let node_id = NodeId(pin_id.0 / 2);
+        if node_graph.nodes.contains_key(&node_id) {
+            Some(node_id)
+        } else {
+            None
+        }
+    }
+
+    /// Check if two pins can connect (Output->Input only, cross-window only)
+    pub fn can_connect_pins(&self, from_pin: PinId, to_pin: PinId, node_graph: &NodeGraph) -> bool {
+        // Must be Output->Input
+        if !Self::is_output_node(from_pin) || !Self::is_input_node(to_pin) {
+            return false;
+        }
+
+        // Must be cross-window (different nodes)
+        let from_node = match self.get_pin_owner_node(from_pin, node_graph) {
+            Some(node) => node,
+            None => return false,
+        };
+        let to_node = match self.get_pin_owner_node(to_pin, node_graph) {
+            Some(node) => node,
+            None => return false,
+        };
+
+        from_node != to_node
+    }
+}

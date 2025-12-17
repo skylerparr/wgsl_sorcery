@@ -1,4 +1,5 @@
 use crate::node_graph::model::NodeGraph;
+use crate::node_graph::pin_manager::PinPositionManager;
 use crate::node_graph::ui_state::GraphUiState;
 use bevy::prelude::*;
 
@@ -19,6 +20,7 @@ fn main() {
         // Node graph resources
         .init_resource::<NodeGraph>()
         .init_resource::<GraphUiState>()
+        .init_resource::<PinPositionManager>()
         // Systems
         .add_systems(Startup, setup)
         // Canvas systems

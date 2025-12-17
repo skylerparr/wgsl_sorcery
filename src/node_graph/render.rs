@@ -1,4 +1,5 @@
 use crate::node_graph::model::{CanvasState, Connection, NodeGraph, NodeInstance, PinId};
+use crate::node_graph::pin_manager::PinPositionManager;
 use crate::node_graph::ui_state::GraphUiState;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
@@ -67,41 +68,100 @@ pub fn render_canvas_background_system(
     }
 }
 
-pub fn render_connections_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiContexts) {
+pub fn render_connections_system(
+    node_graph: Res<NodeGraph>,
+    mut pin_manager: ResMut<PinPositionManager>,
+    mut egui_contexts: EguiContexts,
+) {
     let ctx = egui_contexts.ctx_mut().expect("Failed to get egui context");
     let painter = ctx.layer_painter(egui::LayerId::background());
 
     let canvas_state = &node_graph.canvas_state;
-    let zoom = canvas_state.zoom;
 
-    // Draw all connections as bezier curves
-    for connection in &node_graph.connections {
-        // Find the source and target pins
-        let (from_pos, to_pos) =
-            find_pin_positions(connection.from_pin, connection.to_pin, &node_graph);
+    // Draw all connections as smooth bezier curves using single point of authority
+    for (connection_index, connection) in node_graph.connections.iter().enumerate() {
+        info!(
+            "RENDER: Rendering connection {}: from pin {:?} to pin {:?}",
+            connection_index, connection.from_pin, connection.to_pin
+        );
 
-        if let (Some(from), Some(to)) = (from_pos, to_pos) {
+        if let Some((from_pos, to_pos)) = pin_manager.get_connection_endpoints(
+            connection.from_pin,
+            connection.to_pin,
+            &node_graph,
+            canvas_state,
+        ) {
+            info!(
+                "RENDER: Connection {} endpoints - from: {:?} to: {:?}",
+                connection_index, from_pos, to_pos
+            );
+
             // Convert to screen positions
-            let from_screen = vec2_to_pos2((from + canvas_state.offset) * zoom);
-            let to_screen = vec2_to_pos2((to + canvas_state.offset) * zoom);
+            let from_screen = vec2_to_pos2(from_pos);
+            let to_screen = vec2_to_pos2(to_pos);
 
-            // Draw bezier curve using line segments as approximation
-            let ctrl_offset = Vec2::new(80.0, 0.0);
-            let ctrl1 = from_screen + egui::vec2(ctrl_offset.x, ctrl_offset.y);
-            let ctrl2 = to_screen - egui::vec2(ctrl_offset.x, ctrl_offset.y);
+            info!(
+                "RENDER: Connection {} screen positions - from: {:?} to: {:?}",
+                connection_index, from_screen, to_screen
+            );
 
-            // Simple line approximation for now
-            painter.line_segment(
-                [from_screen, ctrl1],
-                egui::Stroke::new(2.0 / zoom, egui::Color32::LIGHT_GRAY),
+            // Draw smooth bezier curve using proper control points
+            let distance = (to_screen - from_screen).length();
+            let ctrl_offset = distance * 0.3; // 30% of the distance between points
+
+            // Calculate control points for smooth bezier curve
+            let direction = (to_screen - from_screen).normalized();
+            let perpendicular = egui::vec2(-direction.y, direction.x);
+
+            let ctrl1 = from_screen + perpendicular * 20.0 + direction * ctrl_offset;
+            let ctrl2 = to_screen - perpendicular * 20.0 - direction * ctrl_offset;
+
+            info!(
+                "RENDER: Connection {} control points - ctrl1: {:?}, ctrl2: {:?}",
+                connection_index, ctrl1, ctrl2
             );
-            painter.line_segment(
-                [ctrl1, ctrl2],
-                egui::Stroke::new(2.0 / zoom, egui::Color32::LIGHT_GRAY),
+
+            // Draw smooth bezier curve using multiple line segments
+            let segments = 12;
+            let mut prev_point = from_screen;
+
+            for i in 1..=segments {
+                let t = i as f32 / segments as f32;
+
+                // Cubic bezier interpolation
+                let u = 1.0 - t;
+                let tt = t * t;
+                let uu = u * u;
+                let uuu = uu * u;
+                let ttt = tt * t;
+
+                let current_point = egui::pos2(
+                    uuu * from_screen.x
+                        + 3.0 * uu * t * ctrl1.x
+                        + 3.0 * u * tt * ctrl2.x
+                        + ttt * to_screen.x,
+                    uuu * from_screen.y
+                        + 3.0 * uu * t * ctrl1.y
+                        + 3.0 * u * tt * ctrl2.y
+                        + ttt * to_screen.y,
+                );
+
+                painter.line_segment(
+                    [prev_point, current_point],
+                    egui::Stroke::new(3.0, egui::Color32::LIGHT_GRAY),
+                );
+
+                prev_point = current_point;
+            }
+
+            info!(
+                "RENDER: Connection {} rendered successfully",
+                connection_index
             );
-            painter.line_segment(
-                [ctrl2, to_screen],
-                egui::Stroke::new(2.0 / zoom, egui::Color32::LIGHT_GRAY),
+        } else {
+            warn!(
+                "RENDER: Could not find endpoints for connection {}: from pin {:?} to pin {:?}",
+                connection_index, connection.from_pin, connection.to_pin
             );
         }
     }
@@ -110,6 +170,7 @@ pub fn render_connections_system(node_graph: Res<NodeGraph>, mut egui_contexts: 
 pub fn render_pending_connection_system(
     node_graph: Res<NodeGraph>,
     ui_state: Res<GraphUiState>,
+    mut pin_manager: ResMut<PinPositionManager>,
     mut egui_contexts: EguiContexts,
 ) {
     let ctx = egui_contexts.ctx_mut().expect("Failed to get egui context");
@@ -117,11 +178,12 @@ pub fn render_pending_connection_system(
 
     if let Some(pending) = &ui_state.pending_connection {
         let canvas_state = &node_graph.canvas_state;
-        let zoom = canvas_state.zoom;
 
-        // Find the source pin position
-        if let Some(from_pos) = find_pin_position(pending.from_pin, &node_graph) {
-            let from_screen = vec2_to_pos2((from_pos + canvas_state.offset) * zoom);
+        // Find the source pin position using single point of authority
+        if let Some(from_pos) =
+            pin_manager.get_pin_screen_position(pending.from_pin, &node_graph, canvas_state)
+        {
+            let from_screen = vec2_to_pos2(from_pos);
             let end_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or(from_screen);
 
             // Draw temporary bezier curve using line segments
@@ -132,15 +194,15 @@ pub fn render_pending_connection_system(
             // Simple line approximation for now
             painter.line_segment(
                 [from_screen, ctrl1],
-                egui::Stroke::new(2.0 / zoom, egui::Color32::WHITE),
+                egui::Stroke::new(2.0 / canvas_state.zoom, egui::Color32::WHITE),
             );
             painter.line_segment(
                 [ctrl1, ctrl2],
-                egui::Stroke::new(2.0 / zoom, egui::Color32::WHITE),
+                egui::Stroke::new(2.0 / canvas_state.zoom, egui::Color32::WHITE),
             );
             painter.line_segment(
                 [ctrl2, end_pos],
-                egui::Stroke::new(2.0 / zoom, egui::Color32::WHITE),
+                egui::Stroke::new(2.0 / canvas_state.zoom, egui::Color32::WHITE),
             );
         }
     }
@@ -203,26 +265,26 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
 
                     ui.add_space(node_instance.header_height);
 
-                    // DRAW THE BLUE CONNECTION DOTS HERE - positioned within the content area next to input/output sections
-                    let dot_radius = 12.0; // Large, visible dots
+                    // DRAW THE INPUT AND OUTPUT NODES - positioned within the content area next to input/output sections
+                    let dot_radius = 12.0; // Large, visible nodes
 
                     // Create a painter for the current content area
                     let content_painter = ui.painter();
 
-                    // Blue input connection dot - positioned within content area, left side (next to Inputs)
-                    let blue_dot_pos = header_response.rect.min + egui::vec2(50.0, 70.0);
+                    // Input Node (blue) - positioned within content area, left side (next to Inputs)
+                    let input_node_pos = header_response.rect.min + egui::vec2(50.0, 70.0);
                     content_painter.circle_filled(
-                        blue_dot_pos,
+                        input_node_pos,
                         dot_radius,
                         egui::Color32::from_rgb(0, 0, 255), // Pure blue
                     );
 
-                    // Red output connection dot - positioned within content area, right side (next to Outputs)
-                    let red_dot_pos = header_response.rect.min + egui::vec2(170.0, 70.0);
+                    // Output Node (green) - positioned within content area, right side (next to Outputs)
+                    let output_node_pos = header_response.rect.min + egui::vec2(170.0, 70.0);
                     content_painter.circle_filled(
-                        red_dot_pos,
+                        output_node_pos,
                         dot_radius,
-                        egui::Color32::from_rgb(255, 0, 0), // Pure red
+                        egui::Color32::from_rgb(0, 255, 0), // Pure green
                     );
 
                     // Input pins section
@@ -270,40 +332,4 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
                 });
             });
     }
-}
-
-// Helper functions
-fn find_pin_position(pin_id: PinId, node_graph: &NodeGraph) -> Option<Vec2> {
-    for (_, node) in &node_graph.nodes {
-        // Check if this pin_id corresponds to a node connection dot (using node ID as pin ID)
-        if pin_id.0 == node.node_id.0 {
-            // Return the position of the red connection dot center (for node-to-node connections)
-            return Some(node.position + Vec2::new(170.0, 70.0));
-        }
-
-        for input_pin in &node.inputs {
-            if input_pin.pin_id == pin_id {
-                // Calculate input pin position - blue dot center
-                return Some(node.position + Vec2::new(50.0, 70.0));
-            }
-        }
-        for output_pin in &node.outputs {
-            if output_pin.pin_id == pin_id {
-                // Calculate output pin position - red dot center
-                return Some(node.position + Vec2::new(170.0, 70.0));
-            }
-        }
-    }
-    None
-}
-
-fn find_pin_positions(
-    from_pin: PinId,
-    to_pin: PinId,
-    node_graph: &NodeGraph,
-) -> (Option<Vec2>, Option<Vec2>) {
-    (
-        find_pin_position(from_pin, node_graph),
-        find_pin_position(to_pin, node_graph),
-    )
 }
