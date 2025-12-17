@@ -1,4 +1,6 @@
-use crate::node_graph::model::{CanvasState, Connection, NodeGraph, NodeId, NodeInstance, PinId};
+use crate::node_graph::model::{
+    CanvasState, Connection, NodeGraph, NodeId, NodeInstance, NodeLayout, PinId,
+};
 use crate::node_graph::pin_manager::PinPositionManager;
 use crate::node_graph::ui_state::{GraphUiState, PendingConnection};
 use bevy::prelude::*;
@@ -20,6 +22,7 @@ pub fn handle_node_drag_system(
     mut egui_contexts: EguiContexts,
 ) {
     let ctx = egui_contexts.ctx_mut().expect("Failed to get egui context");
+    let layout = NodeLayout::default();
 
     // Handle dragging logic - simplified approach using pointer state directly
     let pointer_pos = ctx.input(|i| i.pointer.latest_pos()).unwrap_or_default();
@@ -66,10 +69,10 @@ pub fn handle_node_drag_system(
             let node_screen_pos =
                 vec2_to_pos2((node_instance.position + canvas_state.offset) * canvas_state.zoom);
 
-            // Check header area
+            // Check header area using centralized layout constants
             let header_rect = egui::Rect::from_min_size(
                 node_screen_pos,
-                egui::vec2(220.0, node_instance.header_height), // Node width and header height
+                egui::vec2(layout.width, layout.header_height),
             );
 
             if header_rect.contains(pointer_pos) {
@@ -93,6 +96,7 @@ pub fn handle_pin_interactions_system(
     mut egui_contexts: EguiContexts,
 ) {
     let ctx = egui_contexts.ctx_mut().expect("Failed to get egui context");
+    let layout = NodeLayout::default();
 
     // First check for mouse release on connection completion
     if ctx.input(|i| i.pointer.any_released()) {
@@ -113,14 +117,15 @@ pub fn handle_pin_interactions_system(
 
                 let dot_radius = 12.0;
 
-                // Calculate the Area rectangle (same as used in render system)
+                // Calculate Area rectangle using centralized layout constants
                 let header_rect = egui::Rect::from_min_size(
                     node_screen_pos,
-                    egui::vec2(220.0, node_instance.header_height + 70.0),
+                    egui::vec2(layout.width, node_instance.header_height + 70.0),
                 );
 
-                // Check Input Node (blue) - positioned at (50.0, 70.0) relative to header_rect.min
-                let input_node_center = header_rect.min + egui::vec2(50.0, 70.0);
+                // Check Input Node (blue) - use centralized layout constants
+                let input_node_center = header_rect.min
+                    + egui::vec2(layout.input_node_offset.x, layout.input_node_offset.y);
                 let input_node_rect = egui::Rect::from_center_size(
                     input_node_center,
                     egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
@@ -158,7 +163,7 @@ pub fn handle_pin_interactions_system(
                             .any(|conn| conn.to_pin.0 == node_instance.node_id.0 * 2);
 
                         if !is_connected {
-                            // Create the connection
+                            // Create connection
                             let new_connection = Connection {
                                 from_pin: pending.from_pin,
                                 to_pin: PinId(node_instance.node_id.0 * 2), // Input Node pin ID
@@ -206,14 +211,15 @@ pub fn handle_pin_interactions_system(
 
             let dot_radius = 12.0;
 
-            // Calculate the Area rectangle (same as used in render system)
+            // Calculate Area rectangle using centralized layout constants
             let header_rect = egui::Rect::from_min_size(
                 node_screen_pos,
-                egui::vec2(220.0, node_instance.header_height + 70.0),
+                egui::vec2(layout.width, node_instance.header_height + 70.0),
             );
 
-            // Check Input Node (blue) - positioned at (50.0, 70.0) relative to header_rect.min
-            let input_node_center = header_rect.min + egui::vec2(50.0, 70.0);
+            // Check Input Node (blue) - use centralized layout constants
+            let input_node_center = header_rect.min
+                + egui::vec2(layout.input_node_offset.x, layout.input_node_offset.y);
             let input_node_rect = egui::Rect::from_center_size(
                 input_node_center,
                 egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
@@ -233,8 +239,9 @@ pub fn handle_pin_interactions_system(
                 break;
             }
 
-            // Check Output Node (green) - positioned at (170.0, 70.0) relative to header_rect.min
-            let output_node_center = header_rect.min + egui::vec2(170.0, 70.0);
+            // Check Output Node (green) - use centralized layout constants
+            let output_node_center = header_rect.min
+                + egui::vec2(layout.output_node_offset.x, layout.output_node_offset.y);
             let output_node_rect = egui::Rect::from_center_size(
                 output_node_center,
                 egui::vec2(dot_radius * 2.0, dot_radius * 2.0),
@@ -310,17 +317,18 @@ pub fn handle_pin_interactions_system(
             let node_screen_pos =
                 vec2_to_pos2((node_instance.position + canvas_state.offset) * canvas_state.zoom);
 
-            // Calculate the Area rectangle (same as used in render system)
+            // Calculate the Area rectangle using centralized layout constants
             let header_rect = egui::Rect::from_min_size(
                 node_screen_pos,
-                egui::vec2(220.0, node_instance.header_height + 70.0),
+                egui::vec2(layout.width, node_instance.header_height + 70.0),
             );
 
-            // Check input pins - positioned relative to header_rect.min (matching render system)
+            // Check input pins - use centralized layout constants
             for (i, input_pin) in node_instance.inputs.iter().enumerate() {
-                let pin_radius = 6.0;
-                let pin_x = -6.0; // Slightly outside the node border (matching render system)
-                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
+                let pin_radius = layout.pin_radius;
+                let pin_x = -layout.pin_margin; // Slightly outside the node border
+                let pin_y =
+                    layout.header_height + layout.pin_spacing + (i as f32 * layout.pin_spacing); // Below header
 
                 let pin_center = header_rect.min + egui::vec2(pin_x, pin_y);
                 let pin_rect = egui::Rect::from_center_size(
@@ -338,11 +346,12 @@ pub fn handle_pin_interactions_system(
                 }
             }
 
-            // Check output pins - positioned relative to header_rect.min (matching render system)
+            // Check output pins - use centralized layout constants
             for (i, output_pin) in node_instance.outputs.iter().enumerate() {
-                let pin_radius = 6.0;
-                let pin_x = 226.0; // Slightly outside the node border (matching render system)
-                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
+                let pin_radius = layout.pin_radius;
+                let pin_x = layout.width + layout.pin_margin; // Slightly outside the node border
+                let pin_y =
+                    layout.header_height + layout.pin_spacing + (i as f32 * layout.pin_spacing); // Below header
 
                 let pin_center = header_rect.min + egui::vec2(pin_x, pin_y);
                 let pin_rect = egui::Rect::from_center_size(

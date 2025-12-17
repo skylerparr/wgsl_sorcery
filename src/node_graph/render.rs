@@ -1,4 +1,6 @@
-use crate::node_graph::model::{CanvasState, Connection, NodeGraph, NodeInstance, PinId};
+use crate::node_graph::model::{
+    CanvasState, Connection, NodeGraph, NodeInstance, NodeLayout, PinId,
+};
 use crate::node_graph::pin_manager::PinPositionManager;
 use crate::node_graph::ui_state::GraphUiState;
 use bevy::prelude::*;
@@ -211,6 +213,7 @@ pub fn render_pending_connection_system(
 pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiContexts) {
     let ctx = egui_contexts.ctx_mut().expect("Failed to get egui context");
     let canvas_state = &node_graph.canvas_state;
+    let layout = NodeLayout::default();
 
     // Create a window for each node using proper canvas->screen transforms
     for (_, node_instance) in node_graph.nodes.iter() {
@@ -231,12 +234,12 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
                     .corner_radius(4.0);
 
                 frame.show(ui, |ui| {
-                    // Set up layout for node content
-                    ui.set_min_size(egui::vec2(220.0, 100.0));
+                    // Set up layout for node content using centralized constants
+                    ui.set_min_size(egui::vec2(layout.width, layout.min_height));
 
-                    // Node header with drag area
+                    // Node header with drag area using centralized constants
                     let (header_response, painter) = ui.allocate_painter(
-                        egui::vec2(220.0, node_instance.header_height),
+                        egui::vec2(layout.width, layout.header_height),
                         egui::Sense::drag(),
                     );
 
@@ -263,44 +266,48 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
                         debug!("Header dragged for node: {:?}", node_instance.node_id);
                     }
 
-                    ui.add_space(node_instance.header_height);
+                    ui.add_space(layout.header_height);
 
-                    // DRAW THE INPUT AND OUTPUT NODES - positioned within the content area next to input/output sections
+                    // DRAW THE INPUT AND OUTPUT NODES - use centralized layout constants
                     let dot_radius = 12.0; // Large, visible nodes
 
                     // Create a painter for the current content area
                     let content_painter = ui.painter();
 
-                    // Input Node (blue) - positioned within content area, left side (next to Inputs)
-                    let input_node_pos = header_response.rect.min + egui::vec2(50.0, 70.0);
+                    // Input Node (blue) - use centralized layout constants
+                    let input_node_pos = header_response.rect.min
+                        + egui::vec2(layout.input_node_offset.x, layout.input_node_offset.y);
                     content_painter.circle_filled(
                         input_node_pos,
                         dot_radius,
                         egui::Color32::from_rgb(0, 0, 255), // Pure blue
                     );
 
-                    // Output Node (green) - positioned within content area, right side (next to Outputs)
-                    let output_node_pos = header_response.rect.min + egui::vec2(170.0, 70.0);
+                    // Output Node (green) - use centralized layout constants
+                    let output_node_pos = header_response.rect.min
+                        + egui::vec2(layout.output_node_offset.x, layout.output_node_offset.y);
                     content_painter.circle_filled(
                         output_node_pos,
                         dot_radius,
                         egui::Color32::from_rgb(0, 255, 0), // Pure green
                     );
 
-                    // Input pins section
+                    // Input pins section using centralized layout constants
                     ui.horizontal(|ui| {
                         // Input pins on the left
                         ui.vertical(|ui| {
                             ui.label("Inputs:");
                             for (i, input_pin) in node_instance.inputs.iter().enumerate() {
-                                let pin_radius = 6.0;
-                                let pin_x = -6.0; // Slightly outside the node border
-                                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
+                                // Use centralized layout constants for pin positioning
+                                let pin_x = -layout.pin_margin; // Slightly outside the node border
+                                let pin_y = layout.header_height
+                                    + layout.pin_spacing
+                                    + (i as f32 * layout.pin_spacing);
 
                                 // Draw pin circle
                                 painter.circle_filled(
                                     header_response.rect.min + egui::vec2(pin_x, pin_y),
-                                    pin_radius,
+                                    layout.pin_radius,
                                     egui::Color32::from_gray(200),
                                 );
 
@@ -310,18 +317,20 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
 
                         ui.add_space(20.0);
 
-                        // Output pins on the right
+                        // Output pins on the right using centralized layout constants
                         ui.vertical(|ui| {
                             ui.label("Outputs:");
                             for (i, output_pin) in node_instance.outputs.iter().enumerate() {
-                                let pin_radius = 6.0;
-                                let pin_x = 226.0; // Slightly outside the node border
-                                let pin_y = node_instance.header_height + 20.0 + (i as f32 * 20.0); // Below header
+                                // Use centralized layout constants for pin positioning
+                                let pin_x = layout.width + layout.pin_margin; // Slightly outside the node border
+                                let pin_y = layout.header_height
+                                    + layout.pin_spacing
+                                    + (i as f32 * layout.pin_spacing);
 
                                 // Draw pin circle
                                 painter.circle_filled(
                                     header_response.rect.min + egui::vec2(pin_x, pin_y),
-                                    pin_radius,
+                                    layout.pin_radius,
                                     egui::Color32::from_gray(200),
                                 );
 

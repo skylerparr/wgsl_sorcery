@@ -12,6 +12,11 @@ fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
 
+// Cache invalidation system - runs first each frame to ensure fresh pin positions
+fn invalidate_pin_cache_system(mut pin_manager: ResMut<PinPositionManager>) {
+    pin_manager.invalidate_cache();
+}
+
 // Main application with integrated input system
 fn main() {
     App::new()
@@ -25,6 +30,8 @@ fn main() {
         .add_systems(Startup, setup)
         // Canvas systems
         .add_systems(Update, node_graph::canvas::update_canvas_system)
+        // Cache invalidation (run first)
+        .add_systems(Update, invalidate_pin_cache_system)
         .add_systems(Update, node_graph::render::render_canvas_background_system)
         // Node rendering systems
         .add_systems(Update, node_graph::render::render_nodes_system)

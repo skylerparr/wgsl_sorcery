@@ -2,6 +2,34 @@ use bevy::prelude::*;
 use bevy_egui::egui;
 use std::collections::HashMap;
 
+/// Centralized layout constants for node rendering - single source of truth
+#[derive(Debug, Clone)]
+pub struct NodeLayout {
+    pub width: f32,
+    pub min_height: f32,
+    pub header_height: f32,
+    pub pin_radius: f32,
+    pub input_node_offset: Vec2,
+    pub output_node_offset: Vec2,
+    pub pin_spacing: f32,
+    pub pin_margin: f32,
+}
+
+impl Default for NodeLayout {
+    fn default() -> Self {
+        Self {
+            width: 220.0,
+            min_height: 100.0,
+            header_height: 24.0,
+            pin_radius: 6.0,
+            input_node_offset: Vec2::new(50.0, 70.0),
+            output_node_offset: Vec2::new(170.0, 70.0),
+            pin_spacing: 20.0,
+            pin_margin: 6.0,
+        }
+    }
+}
+
 // Unique identifiers for nodes and pins
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId(pub u32);
@@ -52,21 +80,6 @@ pub struct NodeGraph {
 pub struct CanvasState {
     pub zoom: f32,
     pub offset: Vec2,
-}
-
-// Add the GraphUiState struct here
-#[derive(Debug, Clone, Default)]
-pub struct GraphUiState {
-    pub pending_connection: Option<PendingConnection>,
-    pub active_drag_node: Option<NodeId>,
-    pub drag_origin: Vec2,
-    pub drag_offset: Vec2,
-}
-
-#[derive(Debug, Clone)]
-pub struct PendingConnection {
-    pub from_pin: PinId,
-    pub from_screen_pos: egui::Pos2,
 }
 
 impl Default for CanvasState {

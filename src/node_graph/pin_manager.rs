@@ -1,4 +1,4 @@
-use crate::node_graph::model::{CanvasState, NodeGraph, NodeId, PinId};
+use crate::node_graph::model::{CanvasState, NodeGraph, NodeId, NodeLayout, PinId};
 use bevy::prelude::*;
 
 /// Centralized pin position manager - single source of truth for all pin positions
@@ -9,6 +9,8 @@ pub struct PinPositionManager {
     /// Cache invalidation marker
     frame_version: u64,
     current_frame: u64,
+    /// Layout constants
+    layout: NodeLayout,
 }
 
 impl PinPositionManager {
@@ -51,29 +53,39 @@ impl PinPositionManager {
             // Input Nodes: PinId(node_id.0 * 2)
             // Output Nodes: PinId(node_id.0 * 2 + 1)
             if pin_id.0 == node.node_id.0 * 2 {
-                // Input Node position
+                // Input Node position - use centralized layout
                 let screen_pos =
-                    ((node.position + canvas_state.offset) * zoom) + Vec2::new(50.0, 70.0);
+                    ((node.position + canvas_state.offset) * zoom) + self.layout.input_node_offset;
                 return Some(screen_pos);
             } else if pin_id.0 == node.node_id.0 * 2 + 1 {
-                // Output Node position
+                // Output Node position - use centralized layout
                 let screen_pos =
-                    ((node.position + canvas_state.offset) * zoom) + Vec2::new(170.0, 70.0);
+                    ((node.position + canvas_state.offset) * zoom) + self.layout.output_node_offset;
                 return Some(screen_pos);
             }
 
-            // Check traditional pins (fallback)
-            for input_pin in &node.inputs {
+            // Check traditional pins (fallback) - use centralized layout
+            for (i, input_pin) in node.inputs.iter().enumerate() {
                 if input_pin.pin_id == pin_id {
-                    let screen_pos =
-                        ((node.position + canvas_state.offset) * zoom) + Vec2::new(50.0, 70.0);
+                    let pin_offset = Vec2::new(
+                        -self.layout.pin_margin,
+                        self.layout.header_height
+                            + self.layout.pin_spacing
+                            + (i as f32 * self.layout.pin_spacing),
+                    );
+                    let screen_pos = ((node.position + canvas_state.offset) * zoom) + pin_offset;
                     return Some(screen_pos);
                 }
             }
-            for output_pin in &node.outputs {
+            for (i, output_pin) in node.outputs.iter().enumerate() {
                 if output_pin.pin_id == pin_id {
-                    let screen_pos =
-                        ((node.position + canvas_state.offset) * zoom) + Vec2::new(170.0, 70.0);
+                    let pin_offset = Vec2::new(
+                        self.layout.width + self.layout.pin_margin,
+                        self.layout.header_height
+                            + self.layout.pin_spacing
+                            + (i as f32 * self.layout.pin_spacing),
+                    );
+                    let screen_pos = ((node.position + canvas_state.offset) * zoom) + pin_offset;
                     return Some(screen_pos);
                 }
             }
