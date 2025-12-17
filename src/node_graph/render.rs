@@ -268,76 +268,73 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
 
                     ui.add_space(layout.header_height);
 
-                    // DRAW THE INPUT AND OUTPUT NODES - use centralized layout constants
-                    let dot_radius = 12.0; // Large, visible nodes
-
                     // Create a painter for the current content area
                     let content_painter = ui.painter();
 
-                    // Input Node (blue) - use centralized layout constants
-                    let input_node_pos = header_response.rect.min
-                        + egui::vec2(layout.input_node_offset.x, layout.input_node_offset.y);
-                    content_painter.circle_filled(
-                        input_node_pos,
-                        dot_radius,
-                        egui::Color32::from_rgb(0, 0, 255), // Pure blue
-                    );
+                    // Draw input pins on the left with labels
+                    for (i, input_pin) in node_instance.inputs.iter().enumerate() {
+                        // Calculate pin position using centralized layout constants
+                        let pin_x = -layout.pin_margin; // Slightly outside the node border
+                        let pin_y = layout.header_height
+                            + layout.pin_spacing
+                            + (i as f32 * layout.pin_spacing);
 
-                    // Output Node (green) - use centralized layout constants
-                    let output_node_pos = header_response.rect.min
-                        + egui::vec2(layout.output_node_offset.x, layout.output_node_offset.y);
-                    content_painter.circle_filled(
-                        output_node_pos,
-                        dot_radius,
-                        egui::Color32::from_rgb(0, 255, 0), // Pure green
-                    );
+                        let pin_pos = header_response.rect.min + egui::vec2(pin_x, pin_y);
 
-                    // Input pins section using centralized layout constants
-                    ui.horizontal(|ui| {
-                        // Input pins on the left
-                        ui.vertical(|ui| {
-                            ui.label("Inputs:");
-                            for (i, input_pin) in node_instance.inputs.iter().enumerate() {
-                                // Use centralized layout constants for pin positioning
-                                let pin_x = -layout.pin_margin; // Slightly outside the node border
-                                let pin_y = layout.header_height
-                                    + layout.pin_spacing
-                                    + (i as f32 * layout.pin_spacing);
+                        // Draw pin circle (6px radius as per SPEC.md)
+                        content_painter.circle_filled(
+                            pin_pos,
+                            layout.pin_radius, // 6px radius from NodeLayout
+                            egui::Color32::from_gray(200), // Neutral tone
+                        );
 
-                                // Draw pin circle
-                                painter.circle_filled(
-                                    header_response.rect.min + egui::vec2(pin_x, pin_y),
-                                    layout.pin_radius,
-                                    egui::Color32::from_gray(200),
-                                );
+                        // Draw pin label next to pin
+                        let label_pos =
+                            pin_pos + egui::vec2(layout.pin_radius + 4.0, -layout.pin_radius / 2.0);
+                        content_painter.text(
+                            label_pos,
+                            egui::Align2::LEFT_CENTER,
+                            &input_pin.label,
+                            egui::FontId::default(),
+                            egui::Color32::WHITE,
+                        );
+                    }
 
-                                ui.label(&input_pin.label);
-                            }
-                        });
+                    // Draw output pins on the right with labels
+                    for (i, output_pin) in node_instance.outputs.iter().enumerate() {
+                        // Calculate pin position using centralized layout constants
+                        let pin_x = layout.width + layout.pin_margin; // Slightly outside the node border
+                        let pin_y = layout.header_height
+                            + layout.pin_spacing
+                            + (i as f32 * layout.pin_spacing);
 
-                        ui.add_space(20.0);
+                        let pin_pos = header_response.rect.min + egui::vec2(pin_x, pin_y);
 
-                        // Output pins on the right using centralized layout constants
-                        ui.vertical(|ui| {
-                            ui.label("Outputs:");
-                            for (i, output_pin) in node_instance.outputs.iter().enumerate() {
-                                // Use centralized layout constants for pin positioning
-                                let pin_x = layout.width + layout.pin_margin; // Slightly outside the node border
-                                let pin_y = layout.header_height
-                                    + layout.pin_spacing
-                                    + (i as f32 * layout.pin_spacing);
+                        // Draw pin circle (6px radius as per SPEC.md)
+                        content_painter.circle_filled(
+                            pin_pos,
+                            layout.pin_radius, // 6px radius from NodeLayout
+                            egui::Color32::from_gray(200), // Neutral tone
+                        );
 
-                                // Draw pin circle
-                                painter.circle_filled(
-                                    header_response.rect.min + egui::vec2(pin_x, pin_y),
-                                    layout.pin_radius,
-                                    egui::Color32::from_gray(200),
-                                );
+                        // Draw pin label next to pin (right-aligned)
+                        let label_pos = pin_pos
+                            + egui::vec2(-layout.pin_radius - 4.0, -layout.pin_radius / 2.0);
+                        content_painter.text(
+                            label_pos,
+                            egui::Align2::RIGHT_CENTER,
+                            &output_pin.label,
+                            egui::FontId::default(),
+                            egui::Color32::WHITE,
+                        );
+                    }
 
-                                ui.label(&output_pin.label);
-                            }
-                        });
-                    });
+                    // Reserve space for internal content area (empty for now as per SPEC.md)
+                    let content_height =
+                        (node_instance.inputs.len().max(node_instance.outputs.len()) as f32
+                            * layout.pin_spacing)
+                            + 20.0;
+                    ui.add_space(content_height);
                 });
             });
     }

@@ -49,24 +49,10 @@ impl PinPositionManager {
         let zoom = canvas_state.zoom;
 
         for (_, node) in &node_graph.nodes {
-            // Check node connection dots first (new system)
-            // Input Nodes: PinId(node_id.0 * 2)
-            // Output Nodes: PinId(node_id.0 * 2 + 1)
-            if pin_id.0 == node.node_id.0 * 2 {
-                // Input Node position - use centralized layout
-                let screen_pos =
-                    ((node.position + canvas_state.offset) * zoom) + self.layout.input_node_offset;
-                return Some(screen_pos);
-            } else if pin_id.0 == node.node_id.0 * 2 + 1 {
-                // Output Node position - use centralized layout
-                let screen_pos =
-                    ((node.position + canvas_state.offset) * zoom) + self.layout.output_node_offset;
-                return Some(screen_pos);
-            }
-
-            // Check traditional pins (fallback) - use centralized layout
+            // Check traditional pins - use centralized layout matching render system
             for (i, input_pin) in node.inputs.iter().enumerate() {
                 if input_pin.pin_id == pin_id {
+                    // Pin position matches render system: outside left margin, below header
                     let pin_offset = Vec2::new(
                         -self.layout.pin_margin,
                         self.layout.header_height
@@ -79,6 +65,7 @@ impl PinPositionManager {
             }
             for (i, output_pin) in node.outputs.iter().enumerate() {
                 if output_pin.pin_id == pin_id {
+                    // Pin position matches render system: outside right margin, below header
                     let pin_offset = Vec2::new(
                         self.layout.width + self.layout.pin_margin,
                         self.layout.header_height
