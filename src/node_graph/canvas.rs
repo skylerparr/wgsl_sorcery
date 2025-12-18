@@ -4,8 +4,8 @@ use bevy::prelude::*;
 
 pub fn update_canvas_system(
     mut node_graph: ResMut<NodeGraph>,
-    mut mouse_wheel_events: EventReader<MouseWheel>,
-    mut mouse_motion_events: EventReader<MouseMotion>,
+    mut mouse_wheel_events: MessageReader<MouseWheel>,
+    mut mouse_motion_events: MessageReader<MouseMotion>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     key_input: Res<ButtonInput<KeyCode>>,
 ) {

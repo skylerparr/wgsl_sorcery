@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_egui::egui;
 use std::collections::HashMap;
 
 /// Centralized layout constants for node rendering - single source of truth

@@ -5,12 +5,12 @@ use bevy::prelude::*;
 #[derive(Resource, Default)]
 pub struct PinPositionManager {
     /// Cache of calculated pin positions in screen space for the current frame
-    cached_positions: std::collections::HashMap<PinId, Vec2>,
+    pub cached_positions: std::collections::HashMap<PinId, Vec2>,
     /// Cache invalidation marker
-    frame_version: u64,
-    current_frame: u64,
+    pub frame_version: u64,
+    pub current_frame: u64,
     /// Layout constants
-    layout: NodeLayout,
+    pub layout: NodeLayout,
 }
 
 impl PinPositionManager {
@@ -21,7 +21,7 @@ impl PinPositionManager {
         node_graph: &NodeGraph,
         canvas_state: &CanvasState,
     ) -> Option<Vec2> {
-        let zoom = canvas_state.zoom;
+        let _zoom = canvas_state.zoom;
 
         // Check cache first
         if let Some(&cached_pos) = self.cached_positions.get(&pin_id) {
@@ -40,7 +40,7 @@ impl PinPositionManager {
     }
 
     /// Calculate pin position in screen space (internal calculation)
-    fn calculate_pin_position_raw(
+    pub fn calculate_pin_position_raw(
         &self,
         pin_id: PinId,
         node_graph: &NodeGraph,
@@ -123,12 +123,14 @@ impl PinPositionManager {
 
     /// Get the node that owns this pin
     pub fn get_pin_owner_node(&self, pin_id: PinId, node_graph: &NodeGraph) -> Option<NodeId> {
-        let node_id = NodeId(pin_id.0 / 2);
-        if node_graph.nodes.contains_key(&node_id) {
-            Some(node_id)
-        } else {
-            None
+        for (node_id, node) in &node_graph.nodes {
+            if node.inputs.iter().any(|p| p.pin_id == pin_id)
+                || node.outputs.iter().any(|p| p.pin_id == pin_id)
+            {
+                return Some(*node_id);
+            }
         }
+        None
     }
 
     /// Check if two pins can connect (Output->Input only, cross-window only)

@@ -1,6 +1,4 @@
-use crate::node_graph::model::{
-    CanvasState, Connection, NodeGraph, NodeInstance, NodeLayout, PinId,
-};
+use crate::node_graph::model::{NodeGraph, NodeInstance, NodeLayout, PinId};
 use crate::node_graph::pin_manager::PinPositionManager;
 use crate::node_graph::ui_state::GraphUiState;
 use bevy::prelude::*;
@@ -28,7 +26,7 @@ pub fn render_canvas_background_system(
     let zoom = canvas_state.zoom;
 
     // Calculate visible grid range in screen space
-    let screen_rect = ctx.screen_rect();
+    let screen_rect = ctx.viewport_rect();
 
     // Draw grid lines using canvas->screen transforms
     let grid_spacing = 48.0; // Base grid spacing in canvas space
@@ -82,30 +80,15 @@ pub fn render_connections_system(
 
     // Draw all connections as smooth bezier curves using single point of authority
     for (connection_index, connection) in node_graph.connections.iter().enumerate() {
-        info!(
-            "RENDER: Rendering connection {}: from pin {:?} to pin {:?}",
-            connection_index, connection.from_pin, connection.to_pin
-        );
-
         if let Some((from_pos, to_pos)) = pin_manager.get_connection_endpoints(
             connection.from_pin,
             connection.to_pin,
             &node_graph,
             canvas_state,
         ) {
-            info!(
-                "RENDER: Connection {} endpoints - from: {:?} to: {:?}",
-                connection_index, from_pos, to_pos
-            );
-
             // Convert to screen positions
             let from_screen = vec2_to_pos2(from_pos);
             let to_screen = vec2_to_pos2(to_pos);
-
-            info!(
-                "RENDER: Connection {} screen positions - from: {:?} to: {:?}",
-                connection_index, from_screen, to_screen
-            );
 
             // Draw smooth bezier curve using proper control points
             let distance = (to_screen - from_screen).length();
@@ -117,11 +100,6 @@ pub fn render_connections_system(
 
             let ctrl1 = from_screen + perpendicular * 20.0 + direction * ctrl_offset;
             let ctrl2 = to_screen - perpendicular * 20.0 - direction * ctrl_offset;
-
-            info!(
-                "RENDER: Connection {} control points - ctrl1: {:?}, ctrl2: {:?}",
-                connection_index, ctrl1, ctrl2
-            );
 
             // Draw smooth bezier curve using multiple line segments
             let segments = 12;
@@ -155,11 +133,6 @@ pub fn render_connections_system(
 
                 prev_point = current_point;
             }
-
-            info!(
-                "RENDER: Connection {} rendered successfully",
-                connection_index
-            );
         } else {
             warn!(
                 "RENDER: Could not find endpoints for connection {}: from pin {:?} to pin {:?}",
@@ -274,7 +247,7 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
                     // Draw input pins on the left with labels
                     for (i, input_pin) in node_instance.inputs.iter().enumerate() {
                         // Calculate pin position using centralized layout constants
-                        let pin_x = -layout.pin_margin; // Slightly outside the node border
+                        let pin_x = -layout.pin_margin; // Slightly outside of node border
                         let pin_y = layout.header_height
                             + layout.pin_spacing
                             + (i as f32 * layout.pin_spacing);
@@ -303,7 +276,7 @@ pub fn render_nodes_system(node_graph: Res<NodeGraph>, mut egui_contexts: EguiCo
                     // Draw output pins on the right with labels
                     for (i, output_pin) in node_instance.outputs.iter().enumerate() {
                         // Calculate pin position using centralized layout constants
-                        let pin_x = layout.width + layout.pin_margin; // Slightly outside the node border
+                        let pin_x = layout.width + layout.pin_margin; // Slightly outside of node border
                         let pin_y = layout.header_height
                             + layout.pin_spacing
                             + (i as f32 * layout.pin_spacing);
