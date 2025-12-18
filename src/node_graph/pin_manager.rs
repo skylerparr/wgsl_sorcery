@@ -8,7 +8,6 @@ pub struct PinPositionManager {
     pub cached_positions: std::collections::HashMap<PinId, Vec2>,
     /// Cache invalidation marker
     pub frame_version: u64,
-    pub current_frame: u64,
     /// Layout constants
     pub layout: NodeLayout,
 }

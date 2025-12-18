@@ -20,7 +20,13 @@ fn invalidate_pin_cache_system(mut pin_manager: ResMut<PinPositionManager>) {
 // Main application with integrated input system
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: (1920, 1080).into(),
+                ..default()
+            }),
+            ..default()
+        }))
         .add_plugins(bevy_egui::EguiPlugin::default())
         // Node graph resources
         .init_resource::<NodeGraph>()
