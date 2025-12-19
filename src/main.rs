@@ -11,12 +11,6 @@ mod node_graph;
 mod shader_view;
 mod systems;
 
-// Setup function - spawn the duck sprite with velocity component
-fn setup(mut commands: Commands) {
-    // Spawn camera
-    commands.spawn(Camera2d);
-}
-
 // Cache invalidation system - runs first each frame to ensure fresh pin positions
 fn invalidate_pin_cache_system(mut pin_manager: ResMut<PinPositionManager>) {
     pin_manager.invalidate_cache();
@@ -41,7 +35,6 @@ fn main() {
         // Shader view resources
         .init_resource::<ShaderView>()
         // Systems
-        .add_systems(Startup, setup)
         .add_systems(Startup, setup_shader_view)
         // Canvas systems
         .add_systems(Update, node_graph::canvas::update_canvas_system)
