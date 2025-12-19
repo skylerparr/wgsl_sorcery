@@ -48,7 +48,7 @@ require_checkboxes: true      # Must mark tasks complete
 enforce_single_action: true   # One action per response
 
 # Code generation rules
-max_code_lines: 200           # Max lines per generation
+max_code_lines: 1024           # Max lines per generation
 require_imports: true         # Must include imports
 validate_syntax: true         # Check before output
 

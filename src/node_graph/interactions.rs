@@ -1,4 +1,4 @@
-use crate::node_graph::model::{CanvasState, Connection, NodeGraph, NodeId, NodeLayout, PinId};
+use crate::node_graph::model::{CanvasState, Connection, NodeGraph, NodeLayout, PinId};
 use crate::node_graph::pin_manager::PinPositionManager;
 use crate::node_graph::ui_state::{GraphUiState, PendingConnection};
 use bevy::prelude::*;
