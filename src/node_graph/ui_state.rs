@@ -1,4 +1,4 @@
-use crate::node_graph::model::{NodeGraph, NodeId, PinId};
+use crate::node_graph::model::{NodeId, PinId};
 use bevy::prelude::*;
 use bevy_egui::egui;
 

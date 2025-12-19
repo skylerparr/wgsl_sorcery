@@ -90,7 +90,7 @@ pub fn handle_node_drag_system(
 pub fn handle_pin_interactions_system(
     mut node_graph: ResMut<NodeGraph>,
     mut ui_state: ResMut<GraphUiState>,
-    mut pin_manager: ResMut<PinPositionManager>,
+    pin_manager: Res<PinPositionManager>,
     mut egui_contexts: EguiContexts,
 ) {
     let ctx = egui_contexts.ctx_mut().expect("Failed to get egui context");

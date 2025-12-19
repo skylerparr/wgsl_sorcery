@@ -6,7 +6,6 @@ use crate::shader_view::{
 };
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
-use shadplay::plugin::ShadPlayPlugin;
 
 mod node_graph;
 mod shader_view;
