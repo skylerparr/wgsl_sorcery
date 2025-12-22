@@ -1,4 +1,5 @@
 use crate::shader_view::{ShaderView, ShaderViewCamera, ShaderViewEntity};
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::render::render_resource::*;
 use bevy_egui::egui;
@@ -59,17 +60,40 @@ pub fn setup_shader_view(
         ))
         .id();
 
-    // Spawn a camera for the 3D scene (render target to be added later)
+    commands.spawn((
+        PointLight::default(),
+        Transform::from_translation(Vec3::new(0.0, 0.0, 10.0)),
+        RenderLayers::layer(0).with(1),
+    ));
+
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
+            // render before the main pass cameras
+            order: 0,
+            clear_color: Color::srgb(0.1, 0.1, 0.15).into(),
+            ..default()
+        },
+    ));
+
+    // Spawn a camera for the 3D scene that renders to the texture
     let camera_entity = commands
         .spawn((
             Camera3d::default(),
+            Camera {
+                // render before the main pass cameras
+                order: -1,
+                target: render_target_image.clone().into(),
+                clear_color: Color::srgb(0.1, 0.1, 0.15).into(),
+                ..default()
+            },
             Transform::from_translation(Vec3::new(0.0, 1.5, 6.0))
                 .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             ShaderViewCamera,
         ))
         .id();
 
-    // Add basic lighting
+    // Add lighting for the render-to-texture scene
     commands.spawn((
         DirectionalLight {
             illuminance: 15000.0,
@@ -164,6 +188,18 @@ pub fn render_shader_preview(
         return;
     }
 
+    // Get the texture ID before borrowing the context mutably
+    let texture_id = if shader_view.render_target_image != Handle::default() {
+        contexts
+            .image_id(&shader_view.render_target_image)
+            .unwrap_or_else(|| {
+                // Fallback to a white texture if the render target is not available
+                egui::TextureId::Managed(0)
+            })
+    } else {
+        egui::TextureId::Managed(0)
+    };
+
     // Now try to access the egui context
     if let Ok(ctx) = contexts.ctx_mut() {
         egui::Window::new("Shader Preview")
@@ -181,20 +217,8 @@ pub fn render_shader_preview(
                     let available_size = ui.available_size();
                     let size = egui::vec2(available_size.x.min(512.0), available_size.y.min(512.0));
 
-                    // Simple placeholder for now - we'll show the render target status
-                    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-                    ui.painter().rect_filled(
-                        rect,
-                        egui::CornerRadius::same(4),
-                        egui::Color32::from_rgb(40, 40, 80),
-                    );
-                    ui.painter().text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "Render Target Active",
-                        egui::FontId::default(),
-                        egui::Color32::WHITE,
-                    );
+                    // Display the actual render target texture
+                    ui.image((texture_id, size));
 
                     ui.add_space(5.0);
                     if let Some(image) = images.get(&shader_view.render_target_image) {
@@ -215,7 +239,7 @@ pub fn render_shader_preview(
                 ui.add_space(5.0);
                 ui.label("Status: PBR sphere rendering");
                 ui.label("Render target: Active");
-                ui.label("Camera: 3D perspective");
+                ui.label("Camera: 3D perspective (render to texture)");
                 ui.label("Lighting: Directional + Ambient");
             });
     }
