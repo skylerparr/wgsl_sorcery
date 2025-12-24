@@ -2,7 +2,8 @@ use crate::node_graph::model::NodeGraph;
 use crate::node_graph::pin_manager::PinPositionManager;
 use crate::node_graph::ui_state::GraphUiState;
 use crate::shader_view::{
-    ShaderView, apply_shader, hot_reload_shaders, render_shader_preview, setup_shader_view,
+    ShaderView, apply_shader, 
+    hot_reload_shaders, setup_shader_view,
 };
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
@@ -18,15 +19,18 @@ fn invalidate_pin_cache_system(mut pin_manager: ResMut<PinPositionManager>) {
 
 // Main application with integrated input system
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                resolution: (1920, 1080).into(),
-                ..default()
-            }),
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            resolution: (1920, 1080).into(),
             ..default()
-        }))
-        .add_plugins(EguiPlugin::default())
+        }),
+        ..default()
+    }));
+    #[cfg(feature = "mcp")]
+    app.add_plugins(bevy_brp_extras::BrpExtrasPlugin::default());
+
+    app.add_plugins(EguiPlugin::default())
         // .add_plugins(ShadPlayPlugin)
         // Node graph resources
         .init_resource::<NodeGraph>()
@@ -55,7 +59,7 @@ fn main() {
         .add_systems(Update, systems::spawn_node::spawn_test_node_system)
         // Shader view systems
         .add_systems(Update, apply_shader)
-        .add_systems(Update, hot_reload_shaders)
-        .add_systems(Update, render_shader_preview)
-        .run();
+        .add_systems(Update, hot_reload_shaders);
+
+    app.run();
 }

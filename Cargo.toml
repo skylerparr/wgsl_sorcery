@@ -4,9 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = "0.17.3"
-bevy_brp_mcp = "0.17.2"
+bevy = { version = "0.17.3", features = ["dynamic_linking", "jpeg", "png"] }
+bevy_brp_extras = { version = "0.17.2", optional = true }
+bevy_brp_mcp = { version = "0.17.2", optional = true }
 bevy_egui = "0.38.0"
+image = "0.25.9"
+
+[features]
+mcp = ["bevy_brp_extras", "bevy_brp_mcp"] 
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]

@@ -6,7 +6,6 @@ pub struct ShaderView {
     pub shader_handle: Handle<Shader>,
     pub mesh_entity: Option<Entity>,
     pub camera_entity: Option<Entity>,
-    pub render_target_image: Handle<Image>,
 }
 
 impl Default for ShaderView {
@@ -15,7 +14,6 @@ impl Default for ShaderView {
             shader_handle: Handle::default(),
             mesh_entity: None,
             camera_entity: None,
-            render_target_image: Handle::default(),
         }
     }
 }

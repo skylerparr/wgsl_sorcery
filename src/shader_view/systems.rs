@@ -21,24 +21,6 @@ pub fn setup_shader_view(
         height: 512,
         ..default()
     };
-    let mut render_target_image = Image {
-        texture_descriptor: TextureDescriptor {
-            label: Some("render_target"),
-            size,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8UnormSrgb,
-            mip_level_count: 1,
-            sample_count: 1,
-            usage: TextureUsages::TEXTURE_BINDING
-                | TextureUsages::RENDER_ATTACHMENT
-                | TextureUsages::COPY_DST,
-            view_formats: &[],
-        },
-        ..default()
-    };
-    render_target_image.resize(size);
-    let render_target_image = images.add(render_target_image);
-
     // Create a simple sphere mesh using basic shape
     let sphere_mesh = meshes.add(Sphere::new(1.0).mesh().ico(5).unwrap());
 
@@ -70,7 +52,7 @@ pub fn setup_shader_view(
         Camera3d::default(),
         Camera {
             // render before the main pass cameras
-            order: 0,
+            order: -1,
             clear_color: Color::srgb(0.1, 0.1, 0.15).into(),
             ..default()
         },
@@ -82,8 +64,7 @@ pub fn setup_shader_view(
             Camera3d::default(),
             Camera {
                 // render before the main pass cameras
-                order: -1,
-                target: render_target_image.clone().into(),
+                order: 0,
                 clear_color: Color::srgb(0.1, 0.1, 0.15).into(),
                 ..default()
             },
@@ -125,7 +106,6 @@ pub fn setup_shader_view(
         shader_handle: default_shader.clone(),
         mesh_entity: Some(sphere_entity),
         camera_entity: Some(camera_entity),
-        render_target_image: render_target_image.clone(),
     });
 
     info!("Shader view setup complete with 3D sphere and render target");
@@ -166,81 +146,5 @@ pub fn hot_reload_shaders(
             include_str!("../default.wgsl"),
             "default.wgsl",
         ));
-    }
-}
-
-// Resource to track initialization frames
-#[derive(Resource, Default)]
-pub struct EguiInitTracker {
-    pub frame_count: u32,
-}
-
-/// System to render the shader preview in the UI
-pub fn render_shader_preview(
-    shader_view: Res<ShaderView>,
-    images: Res<Assets<Image>>,
-    mut contexts: bevy_egui::EguiContexts,
-    mut init_tracker: Local<EguiInitTracker>,
-) {
-    // Skip the first few frames to let egui initialize properly
-    init_tracker.frame_count += 1;
-    if init_tracker.frame_count < 10 {
-        return;
-    }
-
-    // Get the texture ID before borrowing the context mutably
-    let texture_id = if shader_view.render_target_image != Handle::default() {
-        contexts
-            .image_id(&shader_view.render_target_image)
-            .unwrap_or_else(|| {
-                // Fallback to a white texture if the render target is not available
-                egui::TextureId::Managed(0)
-            })
-    } else {
-        egui::TextureId::Managed(0)
-    };
-
-    // Now try to access the egui context
-    if let Ok(ctx) = contexts.ctx_mut() {
-        egui::Window::new("Shader Preview")
-            .default_size(egui::vec2(512.0, 550.0))
-            .resizable(true)
-            .show(ctx, |ui| {
-                ui.label("WGSL Shader Preview");
-                ui.label("3D Sphere with PBR material");
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(5.0);
-
-                // Display the render target image
-                if shader_view.render_target_image != Handle::default() {
-                    let available_size = ui.available_size();
-                    let size = egui::vec2(available_size.x.min(512.0), available_size.y.min(512.0));
-
-                    // Display the actual render target texture
-                    ui.image((texture_id, size));
-
-                    ui.add_space(5.0);
-                    if let Some(image) = images.get(&shader_view.render_target_image) {
-                        ui.label(format!(
-                            "Render target: {}x{}",
-                            image.size().x,
-                            image.size().y
-                        ));
-                    } else {
-                        ui.label("Render target: 512x512");
-                    }
-                } else {
-                    ui.label("Render target not initialized");
-                }
-
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(5.0);
-                ui.label("Status: PBR sphere rendering");
-                ui.label("Render target: Active");
-                ui.label("Camera: 3D perspective (render to texture)");
-                ui.label("Lighting: Directional + Ambient");
-            });
     }
 }

@@ -16,12 +16,35 @@ struct FragmentOutput {
     @location(0) color: vec4<f32>,
 };
 
+// Camera and transform uniforms
+struct CameraUniforms {
+    view_proj: mat4x4<f32>,
+};
+
+struct ModelUniforms {
+    model: mat4x4<f32>,
+};
+
+@group(0) @binding(0)
+var<uniform> camera: CameraUniforms;
+
+@group(0) @binding(1)
+var<uniform> model: ModelUniforms;
+
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.clip_position = vec4<f32>(vertex.position, 1.0);
-    out.world_position = vertex.position;
-    out.world_normal = vertex.normal;
+    
+    // Apply model transformation to get world position
+    let world_pos = model.model * vec4<f32>(vertex.position, 1.0);
+    out.world_position = world_pos.xyz;
+    
+    // Transform normal to world space (using only the rotation part of model matrix)
+    out.world_normal = (model.model * vec4<f32>(vertex.normal, 0.0)).xyz;
+    
+    // Apply view-projection transformation to get clip position
+    out.clip_position = camera.view_proj * world_pos;
+    
     out.uv = vertex.uv;
     return out;
 }
